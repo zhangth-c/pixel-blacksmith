@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>星炉铁匠铺 — 像素抽卡锻造物语 v2.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app" class="game-shell">
+    <!-- Top Pixel HUD -->
+    <header class="hud-bar pixel-panel">
+      <div class="hud-brand">
+        <canvas id="hud-logo" width="32" height="32" class="pixel-icon-canvas"></canvas>
+        <div class="brand-text">
+          <div class="game-title">星炉铁匠铺 <span class="pixel-en">PIXEL FORGE II</span></div>
+          <div class="sub-status">
+            <span id="hud-rank" class="rank-badge">Lv.1 学徒铁匠</span>
+            <span class="rep-wrap">
+              经验 <span id="hud-rep-text">0/100</span>
+              <span class="mini-bar"><span id="hud-rep-fill" style="width: 0%"></span></span>
+            </span>
+            <span id="hud-sp-badge" class="sp-pill hidden">技能点 +0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-resources">
+        <div class="res-pill gold-pill" title="金币：用于购买材料、锻造和工坊升级">
+          <span class="res-icon" data-sprite="coin"></span>
+          <span class="res-label">金币</span>
+          <span id="hud-gold" class="res-val pixel-num">600</span>
+        </div>
+        <div class="res-pill gem-pill" title="星钻：用于时空星界神炉抽卡">
+          <span class="res-icon" data-sprite="star_gem"></span>
+          <span class="res-label">星钻</span>
+          <span id="hud-gems" class="res-val pixel-num">15</span>
+        </div>
+        <div class="res-pill dust-pill" title="附魔尘：用于给装备添加属性、强化与洗练">
+          <span class="res-icon" data-sprite="enchant_dust"></span>
+          <span class="res-label">附魔尘</span>
+          <span id="hud-dust" class="res-val pixel-num">20</span>
+        </div>
+        <div class="res-pill day-pill" title="当前营业天数">
+          <span class="res-label">DAY</span>
+          <span id="hud-day" class="res-val pixel-num">1</span>
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <button id="btn-sound" class="pixel-btn btn-small" title="开关8-bit音效">音效: 开</button>
+        <button id="btn-save" class="pixel-btn btn-small" title="手动存档">存档</button>
+        <button id="btn-help" class="pixel-btn btn-small" title="玩法与元素百科">指南</button>
+        <button id="btn-reset" class="pixel-btn btn-small btn-danger" title="重置存档">重置</button>
+      </div>
+    </header>
+
+    <!-- Main Split Layout -->
+    <main class="main-grid">
+      <!-- Left Column: Live Pixel Workshop Scene + Equipment Inventory -->
+      <section class="left-column">
+        <!-- Animated Pixel Art Workshop Stage -->
+        <div class="stage-card pixel-panel">
+          <div class="stage-header">
+            <span class="panel-tag">工坊实景</span>
+            <div class="stage-indicators">
+              <span id="stage-furnace-lvl" class="tag-chip">熔炉 Lv.1</span>
+              <span id="stage-anvil-lvl" class="tag-chip">铁砧 Lv.1</span>
+              <span id="stage-luck-info" class="tag-chip chip-gold">品质加成 +0</span>
+            </div>
+          </div>
+          <div class="canvas-wrapper">
+            <canvas id="workshop-canvas" width="480" height="320"></canvas>
+            <!-- Interactive Timing Bar Overlay during active forging -->
+            <div id="forge-minigame-overlay" class="forge-overlay hidden">
+              <div class="forge-mini-box pixel-panel-dark">
+                <div class="forge-mini-title">
+                  <span>敲击火候！第 <b id="mini-strike-num">1</b>/3 锤</span>
+                  <span id="mini-quality-score" class="pixel-num">品质分: 0</span>
+                </div>
+                <div class="timing-track">
+                  <div class="zone zone-good" style="left: 22%; width: 56%;"></div>
+                  <div class="zone zone-great" style="left: 36%; width: 28%;"></div>
+                  <div id="zone-perfect" class="zone zone-perfect" style="left: 46%; width: 8%;"></div>
+                  <div id="timing-cursor" class="timing-cursor" style="left: 0%;"></div>
+                </div>
+                <div class="forge-mini-controls">
+                  <button id="btn-hammer-hit" class="pixel-btn btn-fire">敲击铁砧! (空格键)</button>
+                  <span id="mini-feedback" class="mini-feedback">瞄准金色中心!</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Live Ticker / Log -->
+          <div class="log-strip">
+            <span class="log-badge">铁匠日志</span>
+            <div id="activity-log" class="log-text">欢迎来到星炉铁匠铺 v2.0！52 款奇幻典故神兵、五行与光暗时空运属性、铁匠技能树已全面上线！</div>
+          </div>
+        </div>
+
+        <!-- Equipment Warehouse / Inventory -->
+        <div class="inventory-card pixel-panel">
+          <div class="panel-header">
+            <div class="panel-title-group">
+              <span class="panel-tag">装备仓库</span>
+              <span id="inv-count" class="count-chip pixel-num">0 / 24</span>
+            </div>
+            <div class="inv-tools">
+              <select id="inv-filter" class="pixel-select">
+                <option value="all">全部装备</option>
+                <option value="weapon">仅武器</option>
+                <option value="armor">仅防具</option>
+                <option value="high">SR及以上</option>
+              </select>
+              <select id="inv-sort" class="pixel-select">
+                <option value="newest">最新打造</option>
+                <option value="value">价值最高</option>
+                <option value="rarity">稀有度最高</option>
+                <option value="power">战力最高</option>
+              </select>
+              <button id="btn-quicksell-junk" class="pixel-btn btn-small btn-gold" title="一键卖出所有未锁定的普通(N)和精良(R)装备">清仓(N/R)</button>
+            </div>
+          </div>
+          <div id="inventory-grid" class="inventory-grid"></div>
+        </div>
+      </section>
+
+      <!-- Right Column: Tabbed Operations -->
+      <section class="right-column pixel-panel">
+        <nav class="tab-bar" role="tablist">
+          <button class="tab-btn active" data-tab="forge">
+            <span class="tab-sprite" data-sprite="hammer"></span>
+            <span>锻造台</span>
+          </button>
+          <button class="tab-btn" data-tab="enchant">
+            <span class="tab-sprite" data-sprite="rune_fire"></span>
+            <span>附魔强化</span>
+          </button>
+          <button class="tab-btn" data-tab="gacha">
+            <span class="tab-sprite" data-sprite="chest"></span>
+            <span>秘境抽卡</span>
+            <span id="gacha-pity-badge" class="tab-badge">0/40</span>
+          </button>
+          <button class="tab-btn" data-tab="market">
+            <span class="tab-sprite" data-sprite="ore_iron"></span>
+            <span>材料商店</span>
+          </button>
+          <button class="tab-btn" data-tab="counter">
+            <span class="tab-sprite" data-sprite="coin"></span>
+            <span>售卖柜台</span>
+            <span id="counter-badge" class="tab-badge badge-green">3</span>
+          </button>
+          <button class="tab-btn" data-tab="skills">
+            <span class="tab-sprite" data-sprite="skill_book"></span>
+            <span>技能树</span>
+            <span id="skills-sp-badge" class="tab-badge badge-gold hidden">1</span>
+          </button>
+          <button class="tab-btn" data-tab="workshop">
+            <span class="tab-sprite" data-sprite="star_gem"></span>
+            <span>工坊图鉴</span>
+          </button>
+        </nav>
+
+        <div class="tab-body">
+          <!-- TAB 1: FORGE -->
+          <div id="tab-forge" class="tab-pane active">
+            <div class="forge-layout">
+              <div class="forge-section">
+                <div class="section-head">
+                  <h3>1. 选择武器 / 防具典故图纸 (共 52 种)</h3>
+                  <span id="recipe-unlock-count" class="hint-text">已解锁 22 / 52</span>
+                </div>
+                <div id="recipe-subcat-pills" class="cat-pills"></div>
+                <div id="recipe-list" class="recipe-grid"></div>
+              </div>
+
+              <div class="forge-section">
+                <div class="section-head">
+                  <h3>2. 投入主材料 & 辅助催化剂</h3>
+                  <span class="hint-text">秘银/瓦雷利亚钢/振金/乌鲁神铁等高阶材料大幅提升品质与稀有度</span>
+                </div>
+                <div class="forge-slots-row">
+                  <div class="slot-box">
+                    <div class="slot-label">主锻造材料 (必选 ×<span id="forge-primary-need">2</span>)</div>
+                    <div id="primary-mat-picker" class="mat-picker"></div>
+                  </div>
+                  <div class="slot-box">
+                    <div class="slot-label">副材料 (必选 ×<span id="forge-secondary-need">1</span>)</div>
+                    <div id="secondary-mat-picker" class="mat-picker"></div>
+                  </div>
+                  <div class="slot-box">
+                    <div class="slot-label">秘境催化剂 (可选，提升品质/初始词条)</div>
+                    <div id="catalyst-mat-picker" class="mat-picker"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="forge-summary pixel-inset">
+                <div class="forge-preview-left">
+                  <canvas id="forge-preview-canvas" width="64" height="64" class="preview-canvas"></canvas>
+                  <div class="forge-preview-info">
+                    <div id="forge-preview-name" class="preview-title">请选择图纸</div>
+                    <div id="forge-preview-stats" class="preview-stats">基础属性预览</div>
+                    <div id="forge-odds-bar" class="odds-strip"></div>
+                  </div>
+                </div>
+                <div class="forge-preview-actions">
+                  <label class="pixel-check">
+                    <input type="checkbox" id="chk-auto-forge" />
+                    <span>快速自动锻造</span>
+                  </label>
+                  <div class="forge-btn-row">
+                    <button id="btn-start-forge" class="pixel-btn btn-fire btn-large">
+                      开炉锻造 (<span id="forge-cost-gold">24</span>G)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: ENCHANT / ATTRIBUTES -->
+          <div id="tab-enchant" class="tab-pane">
+            <div id="enchant-empty" class="empty-state pixel-inset">
+              <div class="empty-title">请先从左侧【装备仓库】点击选中一件武器或防具</div>
+              <div class="empty-sub">选中后即可铭刻五行（金木水火土）与本源（光·暗·时·空·运）属性词条、激活元素共鸣、强化至 +10 或镶嵌无限宝石！</div>
+            </div>
+            <div id="enchant-workspace" class="enchant-layout hidden">
+              <div class="enchant-item-header pixel-inset">
+                <div class="ench-item-visual">
+                  <canvas id="ench-item-canvas" width="80" height="80" class="preview-canvas-lg"></canvas>
+                  <span id="ench-item-rarity" class="rarity-pill">SR</span>
+                </div>
+                <div class="ench-item-meta">
+                  <div class="ench-title-row">
+                    <h3 id="ench-item-name">精钢长剑 +0</h3>
+                    <button id="btn-lock-item" class="pixel-btn btn-small">锁定保护</button>
+                  </div>
+                  <div id="ench-item-base-stats" class="stat-chips"></div>
+                  <div id="ench-synergy-bar" class="synergy-bar hidden"></div>
+                  <div class="ench-value-row">
+                    <span>预估售价: <b id="ench-item-val" class="gold-text pixel-num">0G</b></span>
+                    <span>综合战力: <b id="ench-item-power" class="cyan-text pixel-num">0</b></span>
+                    <span>词条槽位: <b id="ench-slot-count" class="pixel-num">0/3</b></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Current Affixes List -->
+              <div class="forge-section">
+                <div class="section-head">
+                  <h3>当前装备属性词条</h3>
+                  <span class="hint-text">搭配【时+空】【光+暗】【五行相生】【运+商/星】可触发元素共鸣暴涨售价！</span>
+                </div>
+                <div id="ench-affix-list" class="affix-list"></div>
+              </div>
+
+              <!-- Enchantment Operations Grid -->
+              <div class="enchant-ops-grid">
+                <!-- Op 1: Add New Attribute -->
+                <div class="op-card pixel-inset">
+                  <div class="op-title">1. 铭刻新属性 (附魔)</div>
+                  <div class="op-desc">消耗附魔尘随机铭刻五行/本源词条，或用【定向符文】精准刻录光·暗·时·空·运！</div>
+                  <div class="rune-select-row">
+                    <label>定向符文:</label>
+                    <select id="enchant-rune-select" class="pixel-select"></select>
+                  </div>
+                  <button id="btn-add-affix" class="pixel-btn btn-purple">铭刻新属性</button>
+                </div>
+
+                <!-- Op 2: Strengthen +1~+10 -->
+                <div class="op-card pixel-inset">
+                  <div class="op-title">2. 铁砧强化 (+1 ~ +10)</div>
+                  <div class="op-desc">大幅提升基础攻防与售价！失败不碎装备，并累积必成祝福值。</div>
+                  <div class="upgrade-meta">
+                    <span>成功率: <b id="up-rate" class="green-text">100%</b></span>
+                    <span>祝福值: <b id="up-blessing" class="gold-text">0%</b></span>
+                  </div>
+                  <label class="pixel-check small-check">
+                    <input type="checkbox" id="chk-use-charm" />
+                    <span>使用祝福护符 (+25%成功率, 余 <b id="charm-count">0</b>)</span>
+                  </label>
+                  <button id="btn-strengthen" class="pixel-btn btn-fire">强化装备</button>
+                </div>
+
+                <!-- Op 3: Reforge Affixes -->
+                <div class="op-card pixel-inset">
+                  <div class="op-title">3. 词条洗练 (重铸属性与星级)</div>
+                  <div class="op-desc">重随机所有未锁定词条的元素类型与星级(C~SS)，凑齐时空/光暗/五行共鸣！</div>
+                  <div class="upgrade-meta">
+                    <span>已锁定词条: <b id="locked-affix-num">0</b></span>
+                    <span>消耗: <b id="reforge-cost-text">2 附魔尘 + 40G</b></span>
+                  </div>
+                  <button id="btn-reforge" class="pixel-btn btn-cyan">洗练未锁定词条</button>
+                </div>
+
+                <!-- Op 4: Infuse Gem -->
+                <div class="op-card pixel-inset">
+                  <div class="op-title">4. 宝石镶嵌 (元素觉醒)</div>
+                  <div class="op-desc">镶嵌五行宝石或时间/空间/福灵星钻，赋予流光特效与最高 +115% 售价加成！</div>
+                  <div class="rune-select-row">
+                    <label>选择宝石:</label>
+                    <select id="infuse-gem-select" class="pixel-select"></select>
+                  </div>
+                  <button id="btn-infuse-gem" class="pixel-btn btn-gold">镶嵌觉醒</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: GACHA -->
+          <div id="tab-gacha" class="tab-pane">
+            <div class="gacha-layout">
+              <div class="banner-tabs" id="gacha-banner-tabs"></div>
+
+              <div id="gacha-banner-stage" class="gacha-banner-card pixel-inset">
+                <div class="banner-visual">
+                  <img id="gacha-banner-img" src="assets/banners/banner_mine.png" alt="卡池封面" />
+                </div>
+                <div class="banner-info">
+                  <div class="banner-title-row">
+                    <h2 id="banner-name">边境矿脉寻宝池</h2>
+                    <span id="banner-tag" class="rarity-pill pill-r">基础金币池</span>
+                  </div>
+                  <p id="banner-desc" class="banner-desc"></p>
+                  <div class="pity-meters">
+                    <div class="pity-box">
+                      <span>十连/SR保底: <b id="pity-sr-text">0/10</b></span>
+                      <div class="mini-bar"><span id="pity-sr-bar" style="width:0%"></span></div>
+                    </div>
+                    <div class="pity-box">
+                      <span>SSR大保底: <b id="pity-ssr-text">0/40</b></span>
+                      <div class="mini-bar bar-gold"><span id="pity-ssr-bar" style="width:0%"></span></div>
+                    </div>
+                  </div>
+                  <div id="banner-rates" class="rates-strip"></div>
+                </div>
+              </div>
+
+              <div class="gacha-actions-bar">
+                <button id="btn-pull-1" class="pixel-btn btn-large btn-cyan">单抽 ×1</button>
+                <button id="btn-pull-10" class="pixel-btn btn-large btn-gold">十连抽 ×10 (必出SR+)</button>
+                <button id="btn-exchange-gems" class="pixel-btn btn-small" title="用金币兑换星钻">金币换星钻 (250G→1星钻)</button>
+              </div>
+
+              <div class="forge-section">
+                <div class="section-head">
+                  <h3>卡池高阶产出预览 (传说金属 / 五行与时空符文 / 典故图纸 / 觉醒宝石)</h3>
+                </div>
+                <div id="gacha-pool-preview" class="pool-preview-grid"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 4: MATERIAL MARKET -->
+          <div id="tab-market" class="tab-pane">
+            <div class="market-top-bar pixel-inset">
+              <div>
+                <div class="market-title">矮人商队材料市场</div>
+                <div class="market-sub">每日行情波动，绿色为今日特价！瓦雷利亚钢、振金、乌鲁神铁等顶级传说材料可通过秘境抽卡获取。</div>
+              </div>
+              <div class="market-btns">
+                <button id="btn-refresh-market" class="pixel-btn btn-small btn-cyan">刷新行情 (40G)</button>
+                <button id="btn-open-bag" class="pixel-btn btn-small">查看我的材料袋</button>
+              </div>
+            </div>
+
+            <div class="market-filter-row">
+              <button class="mini-pill active" data-market-cat="all">全部商品</button>
+              <button class="mini-pill" data-market-cat="metal">金属矿石</button>
+              <button class="mini-pill" data-market-cat="sub">木材与织物</button>
+              <button class="mini-pill" data-market-cat="enchant">附魔与触媒</button>
+              <button class="mini-pill" data-market-cat="bag">我的仓库材料</button>
+            </div>
+
+            <div id="market-grid" class="market-grid"></div>
+          </div>
+
+          <!-- TAB 5: ADVENTURER COUNTER & AUCTION -->
+          <div id="tab-counter" class="tab-pane">
+            <div class="counter-top-bar pixel-inset">
+              <div>
+                <div class="market-title">冒险者交易柜台 & 皇家拍卖</div>
+                <div class="market-sub">满足冒险者的元素偏好可享 1.4x ~ 2.4x 溢价！附带【运】属性成交更有概率额外爆出星钻！</div>
+              </div>
+              <div class="market-btns">
+                <button id="btn-next-day" class="pixel-btn btn-small btn-gold">迎接新一批客人 (下一天)</button>
+                <button id="btn-open-auction" class="pixel-btn btn-small btn-purple">皇家拍卖行 (SR+)</button>
+              </div>
+            </div>
+
+            <div id="customer-list" class="customer-list"></div>
+
+            <div class="direct-sell-box pixel-inset">
+              <div class="direct-sell-info">
+                <div class="op-title">当前选中装备直接出售 / 拍卖</div>
+                <div id="direct-sell-preview" class="op-desc">请在左侧仓库选中一件装备，再点击上方某位冒险者的【交付成交】或直接在此处原价售出。</div>
+              </div>
+              <div class="direct-sell-btns">
+                <button id="btn-direct-sell" class="pixel-btn btn-gold" disabled>原价直接卖给行商</button>
+                <button id="btn-auction-selected" class="pixel-btn btn-purple" disabled>送入皇家拍卖行</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 6: BLACKSMITH SKILL TREE -->
+          <div id="tab-skills" class="tab-pane">
+            <div class="skills-header pixel-inset">
+              <div class="skills-header-left">
+                <div class="market-title">铁匠宗师技能树</div>
+                <div class="market-sub">通过锻造、附魔、交易和抽卡积累铁匠经验升级！每升 1 级获得 <b>+1 技能点 (SP)</b>，自由打造火锤/附魔/商道流派！</div>
+              </div>
+              <div class="skills-header-right">
+                <div class="sp-counter">
+                  <span>可用技能点:</span>
+                  <b id="skill-sp-avail" class="gold-text pixel-num" style="font-size:18px;">1</b>
+                </div>
+                <div class="sp-counter">
+                  <span>铁匠等级:</span>
+                  <b id="skill-bs-level" class="cyan-text pixel-num">Lv.1</b>
+                </div>
+                <button id="btn-reset-skills" class="pixel-btn btn-small btn-cyan">洗点重置 (120G)</button>
+              </div>
+            </div>
+
+            <div id="skill-tree-branches" class="skill-branches-grid"></div>
+          </div>
+
+          <!-- TAB 7: WORKSHOP UPGRADES & CODEX -->
+          <div id="tab-workshop" class="tab-pane">
+            <div class="forge-section">
+              <div class="section-head">
+                <h3>工坊设施升级</h3>
+                <span class="hint-text">升级铁匠铺设施永久提高出货率、词条槽位与售卖收益</span>
+              </div>
+              <div id="upgrades-grid" class="upgrades-grid"></div>
+            </div>
+
+            <div class="forge-section">
+              <div class="section-head">
+                <h3>奇幻典故锻造图鉴 (52 件)</h3>
+                <span id="codex-progress" class="count-chip">已收集 0/52</span>
+              </div>
+              <div id="stats-summary" class="stats-summary pixel-inset"></div>
+              <div id="codex-grid" class="codex-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: Gacha Reveal -->
+  <div id="modal-gacha" class="modal-backdrop hidden">
+    <div class="modal-box gacha-modal pixel-panel">
+      <div class="modal-header">
+        <h2 id="gacha-modal-title">秘境召唤结果</h2>
+        <div class="modal-header-btns">
+          <button id="btn-reveal-all" class="pixel-btn btn-small btn-gold">全部翻开</button>
+          <button id="btn-close-gacha" class="pixel-btn btn-small">关闭</button>
+        </div>
+      </div>
+      <div id="gacha-cards-grid" class="gacha-cards-grid"></div>
+      <div id="gacha-modal-footer" class="gacha-modal-footer">
+        <button id="btn-gacha-again" class="pixel-btn btn-gold">再来一次!</button>
+        <button id="btn-gacha-ok" class="pixel-btn btn-cyan">确认收入囊中</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Forge Result -->
+  <div id="modal-forge-result" class="modal-backdrop hidden">
+    <div class="modal-box result-modal pixel-panel">
+      <div class="result-burst" id="forge-result-banner">锻造完成!</div>
+      <div class="result-body">
+        <canvas id="result-item-canvas" width="96" height="96" class="preview-canvas-xl"></canvas>
+        <div id="result-rarity-badge" class="rarity-pill">SSR</div>
+        <h2 id="result-item-name">星陨誓约胜利之剑</h2>
+        <div id="result-strike-grade" class="strike-grade">火候评价: 神匠暴击!</div>
+        <div id="result-stats" class="stat-chips center-chips"></div>
+        <div id="result-synergy" class="synergy-bar hidden"></div>
+        <div id="result-affixes" class="affix-list compact-affixes"></div>
+        <div class="result-val-line">预估市场价: <b id="result-item-val" class="gold-text pixel-num">0G</b></div>
+      </div>
+      <div class="result-actions">
+        <button id="btn-result-enchant" class="pixel-btn btn-purple">立刻去附魔</button>
+        <button id="btn-result-close" class="pixel-btn btn-gold">收入仓库</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Royal Auction -->
+  <div id="modal-auction" class="modal-backdrop hidden">
+    <div class="modal-box auction-modal pixel-panel">
+      <div class="modal-header">
+        <h2>皇家拍卖行 — 实时竞价</h2>
+        <button id="btn-close-auction" class="pixel-btn btn-small">关闭</button>
+      </div>
+      <div id="auction-content" class="auction-content"></div>
+    </div>
+  </div>
+
+  <!-- MODAL: Help Guide -->
+  <div id="modal-help" class="modal-backdrop hidden">
+    <div class="modal-box help-modal pixel-panel">
+      <div class="modal-header">
+        <h2>星炉铁匠铺 — 铁匠指南 & 元素共鸣手册</h2>
+        <button id="btn-close-help" class="pixel-btn btn-small">知道了</button>
+      </div>
+      <div class="help-body">
+        <div class="help-step">
+          <b>1. 买材料 & 三大秘境抽卡</b>
+          <p>在【材料商店】采购日常矿石与特价打折货；在【秘境抽卡】抽取摩瑞亚秘银、瓦雷利亚钢、振金、乌鲁神铁、贤者之石、元素符文、无限宝石以及 30 种稀有典故图纸（誓约胜利之剑、霜之哀伤、老魔杖、埃癸斯神盾、无限手套等）！</p>
+        </div>
+        <div class="help-step">
+          <b>2. 五行 + 光暗时空运属性 & 元素共鸣</b>
+          <p>装备可附魔【金·木·水·火·土】五行与【光·暗·时·空·运】五大高阶本源词条！同件装备凑出以下组合立即触发<b>元素共鸣暴涨售价</b>：<br/>
+          · <b>时空主宰 (时+空)</b>：战力 +20% / 售价 +40%<br/>
+          · <b>光暗交响 (光+暗)</b>：战力 +18% / 售价 +35%<br/>
+          · <b>五行相生 (金水/水木/木火/火土/土金)</b>：战力 +12% / 售价 +25%<br/>
+          · <b>五行大圆满 (≥3种五行)</b>：战力 +25% / 售价 +55%<br/>
+          · <b>天命所归 (运+商 或 运+星)</b>：售价 +45%，且带【运】成交有概率爆星钻！</p>
+        </div>
+        <div class="help-step">
+          <b>3. 铁匠升级与技能树</b>
+          <p>每次锻造、附魔、强化、卖装备都会获得铁匠经验！每升 1 级获得 1 点技能点，可在【技能树】升级「火锤宗师」（双生神兵/省料/扩大金色暴击区）、「秘法附魔」（额外词条槽/高星权重）、「商道星运」（讨价还价/抽卡加运/拍卖加轮）。</p>
+        </div>
+        <div class="help-step">
+          <b>4. 冒险者售卖 & 皇家拍卖行</b>
+          <p>对照冒险者偏好的元素标签交付装备可获 1.4x~2.4x 暴利，还能讨价还价。SR 及以上神装解除锁定后可送入【皇家拍卖行】引发贵族轮番竞拍！</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Stack -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="js/audio.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
